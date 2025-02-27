@@ -19,18 +19,18 @@ const config = new Configuration({
 const client = new PlaidApi(config);
 
 export async function POST(req: Request) {
-  const { public_token, user_id } = await req.json();
-
-  try {
-    // Exchange public token
-    const response = await client.itemPublicTokenExchange({
-      public_token,
-    });
-
-    // Store access token with user
-    await User.findByIdAndUpdate(user_id, {
-      plaidAccessToken: response.data.access_token,
-    });
+    const { public_token, user_id } = await req.json();
+  
+    try {
+      // Exchange public token
+      const response = await client.itemPublicTokenExchange({ public_token });
+  
+      // Store access token with YOUR user's ID (not Plaid's)
+      await User.findByIdAndUpdate(
+        user_id,
+        { plaidAccessToken: response.data.access_token },
+        { new: true }
+      );
 
 
     return NextResponse.json({ 

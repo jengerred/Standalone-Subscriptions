@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
-
+import {  NextResponse } from 'next/server';
+import { Configuration, PlaidApi, Products, CountryCode, PlaidEnvironments } from 'plaid';
 
 // Initialize Plaid client
 const plaidClient = new PlaidApi(
@@ -16,48 +15,38 @@ const plaidClient = new PlaidApi(
   })
 );
 
-export async function POST(req: NextRequest) {
-  try {
-    const { client_user_id } = await req.json();
-    
-    // Sandbox configuration
-    const isSandbox = process.env.PLAID_ENV === 'sandbox';
-    const sandboxUserId = process.env.PLAID_SANDBOX_USER;
+// app/api/plaid/link-token/route.ts
+export async function POST() {
+    try {
 
-    const request = {
-      client_name: 'Your App Name',
-      user: {
-        client_user_id: isSandbox ? sandboxUserId : client_user_id,
-        ...(isSandbox && {
-          test_username: "user_good",
-          test_password: "pass_good"
-        })
-      },
-      products: [Products.Auth],
-      country_codes: [CountryCode.Us],
-      language: 'en',
-      ...(isSandbox && { access_token: "sandbox-test-token" })
-    };
-
-    const response = await plaidClient.linkTokenCreate(request);
-    
-    return NextResponse.json({ 
-      link_token: response.data.link_token
-    });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-    const errorDetails = process.env.NODE_ENV === 'development' && error instanceof Error
-      ? error.stack 
-      : undefined;
-
-    return NextResponse.json(
-      {
-        error: errorMessage,
-        ...(errorDetails && { details: errorDetails }),
-        code: 'PLAID_TOKEN_EXCHANGE_ERROR'
-      },
-      { status: 500 }
-    );
+      
+      // Always use sandbox credentials in sandbox mode
+      const isSandbox = process.env.PLAID_ENV === 'sandbox';
+      const sandboxUserId = "custom_demo_user"; // Hardcode for testing
+  
+      const request = {
+        client_name: 'Subscription Manager',
+        user: {
+          client_user_id: sandboxUserId, // Always use sandbox ID in sandbox
+          ...(isSandbox && {
+            test_username: "user_good",
+            test_password: "pass_good"
+          })
+        },
+        products: [Products.Auth],
+        country_codes: [CountryCode.Us],
+        language: 'en'
+      };
+  
+      console.log('Plaid Request:', request); // Add logging
+      const response = await plaidClient.linkTokenCreate(request);
+      return NextResponse.json({ link_token: response.data.link_token });
+    } catch (error) {
+      console.error('Plaid Error Details:', error);
+      return NextResponse.json(
+        { error: "Failed to generate link token" },
+        { status: 500 }
+      );
+    }
   }
-}
+  

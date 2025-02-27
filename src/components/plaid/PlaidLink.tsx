@@ -7,22 +7,19 @@ export default function PlaidLink() {
     const [error, setError] = useState<string | null>(null);
   
     useEffect(() => {
-      const isSandbox = process.env.NEXT_PUBLIC_PLAID_ENV === 'sandbox';
-      
-      const fetchToken = async () => {
-        try {
-          const response = await axios.post("/api/plaid/link-token", {
-            client_user_id: isSandbox ? "custom_demo_user" : undefined
-          });
-          setLinkToken(response.data.link_token);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Failed to initialize Plaid connection";
-          setError(message);
-        }
-      };
-  
-      fetchToken();
-    }, []);
+        const fetchToken = async () => {
+          try {
+            const response = await axios.post("/api/plaid/link-token", {
+              client_user_id: "custom_demo_user" // Hardcode for sandbox
+            });
+            setLinkToken(response.data.link_token);
+          } catch (err) {
+            setError("Failed to connect to Plaid");
+            console.error('Link Error:', err);
+          }
+        };
+        fetchToken();
+      }, []);
   
     const { open, ready } = usePlaidLink({
       token: linkToken,
