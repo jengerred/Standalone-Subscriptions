@@ -1,7 +1,10 @@
-import {  NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { Configuration, PlaidApi, Products, CountryCode, PlaidEnvironments } from 'plaid';
 
-// Initialize Plaid client
+// Verify credentials are loaded
+console.log('Loaded client ID:', process.env.PLAID_CLIENT_ID);
+console.log('Loaded secret:', process.env.PLAID_SECRET?.substring(0, 4) + '*'.repeat(process.env.PLAID_SECRET?.length - 4));
+
 const plaidClient = new PlaidApi(
   new Configuration({
     basePath: PlaidEnvironments[process.env.PLAID_ENV as keyof typeof PlaidEnvironments],
@@ -15,38 +18,25 @@ const plaidClient = new PlaidApi(
   })
 );
 
-// app/api/plaid/link-token/route.ts
 export async function POST() {
-    try {
+  try {
+    const request = {
+      client_name: 'Your App',
+      user: {
+        client_user_id: 'unique_user_id', // Must be unique per user
+      },
+      products: [Products.Auth],
+      country_codes: [CountryCode.Us],
+      language: 'en'
+    };
 
-      
-      // Always use sandbox credentials in sandbox mode
-      const isSandbox = process.env.PLAID_ENV === 'sandbox';
-      const sandboxUserId = "custom_demo_user"; // Hardcode for testing
-  
-      const request = {
-        client_name: 'Subscription Manager',
-        user: {
-          client_user_id: sandboxUserId, // Always use sandbox ID in sandbox
-          ...(isSandbox && {
-            test_username: "user_good",
-            test_password: "pass_good"
-          })
-        },
-        products: [Products.Auth],
-        country_codes: [CountryCode.Us],
-        language: 'en'
-      };
-  
-      console.log('Plaid Request:', request); // Add logging
-      const response = await plaidClient.linkTokenCreate(request);
-      return NextResponse.json({ link_token: response.data.link_token });
-    } catch (error) {
-      console.error('Plaid Error Details:', error);
-      return NextResponse.json(
-        { error: "Failed to generate link token" },
-        { status: 500 }
-      );
-    }
+    const response = await plaidClient.linkTokenCreate(request);
+    return NextResponse.json({ link_token: response.data.link_token });
+  } catch (error) {
+    console.error('Plaid Error:', error?.response?.data || error.message);
+    return NextResponse.json(
+      { error: 'Link token creation failed' },
+      { status: 400 }
+    );
   }
-  
+}
