@@ -1,79 +1,139 @@
-// Import necessary modules from mongoose for schema definition and model creation
+// Updated User.ts with Plaid integration
 import { Document, Schema, model, models } from 'mongoose';
-
-// Import bcrypt for password hashing
-// NOTE: bcrypt is used for secure password hashing, which is crucial for user data protection
 import bcrypt from 'bcryptjs';
 
-// Define the User interface extending Mongoose's Document interface
-// NOTE: This interface defines the structure and methods of a User document
 export interface IUser extends Document {
     email: string;
     password: string;
     firstName: string;
     createdAt: Date;
-
-    // Method to compare a candidate password with the stored hashed password
-    // NOTE: This method will be implemented on the schema below
+    plaidAccessToken?: string; // Added Plaid access token
+    plaidItemId?: string;      // Added Plaid item ID
+    subscriptions: Subscription[]; // Added subscriptions array
+    paymentMethods: PaymentMethod[]; // Added payment methods array
     comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
-// Define the Mongoose schema for the User model
-// NOTE: This schema defines the structure and validation rules for User documents in MongoDB
+// Interface for subscription objects
+interface Subscription {
+    service: string;
+    status: 'active' | 'canceled' | 'paused';
+    nextBilling: Date;
+    paymentMethodId: string; // Reference to payment method
+}
+
+// Interface for payment methods
+interface PaymentMethod {
+    plaidItemId: string;
+    lastFourDigits: string;
+    institutionName: string;
+    createdAt: Date;
+}
+
+const paymentMethodSchema = new Schema<PaymentMethod>({
+    plaidItemId: { 
+        type: String, 
+        required: true,
+        immutable: true
+    },
+    lastFourDigits: {
+        type: String,
+        required: true,
+        match: [/^\d{4}$/, 'Last 4 digits must be 4 numbers']
+    },
+    institutionName: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+        immutable: true
+    }
+});
+
+const subscriptionSchema = new Schema<Subscription>({
+    service: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: [50, 'Service name cannot exceed 50 characters']
+    },
+    status: {
+        type: String,
+        enum: ['active', 'canceled', 'paused'],
+        default: 'active'
+    },
+    nextBilling: {
+        type: Date,
+        required: true
+    },
+    paymentMethodId: {
+        type: String,
+        required: true,
+        match: [/^pm_\w+$/, 'Invalid payment method ID format']
+    }
+});
+
 const userSchema = new Schema<IUser>({
-  email: { 
-    type: String, 
-    required: [true, 'Email is required'],
-    unique: true, // Ensure email addresses are unique
-    match: [/^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/, 'Invalid email format'], // Validate email format
-    trim: true, // Remove whitespace from both ends
-    lowercase: true // Convert email to lowercase
-  },
-  password: { 
-    type: String, 
-    required: [true, 'Password is required'],
-    minlength: [12, 'Password must be at least 12 characters'],
-    select: false // Exclude password field from query results by default for security
-  },
-  firstName: { 
-    type: String, 
-    required: [true, 'First name is required'],
-    trim: true, // Remove whitespace from both ends
-    maxlength: [50, 'First name cannot exceed 50 characters'],
-    match: [/^[a-zA-Z-' ]+$/, 'Invalid characters in first name'] // Validate first name format
-  },
-  createdAt: { 
-    type: Date, 
-    default: Date.now, // Set default value to current date/time
-    immutable: true // Prevent modifications to this field after creation
-  }
+    email: { 
+        type: String, 
+        required: [true, 'Email is required'],
+        unique: true,
+        match: [/^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/, 'Invalid email format'],
+        trim: true,
+        lowercase: true
+    },
+    password: { 
+        type: String, 
+        required: [true, 'Password is required'],
+        minlength: [12, 'Password must be at least 12 characters'],
+        select: false
+    },
+    firstName: { 
+        type: String, 
+        required: [true, 'First name is required'],
+        trim: true,
+        maxlength: [50, 'First name cannot exceed 50 characters'],
+        match: [/^[a-zA-Z-' ]+$/, 'Invalid characters in first name']
+    },
+    createdAt: { 
+        type: Date, 
+        default: Date.now,
+        immutable: true
+    },
+    plaidAccessToken: {
+        type: String,
+        select: false, // Never return access token in queries
+        match: [/^access-sandbox-\w+$/, 'Invalid Plaid access token format']
+    },
+    plaidItemId: {
+        type: String,
+        index: true, // Add index for faster queries
+        match: [/^item-sandbox-\w+$/, 'Invalid Plaid item ID format']
+    },
+    subscriptions: [subscriptionSchema],
+    paymentMethods: [paymentMethodSchema]
 });
 
-// Middleware to hash password before saving
-// NOTE: This pre-save hook ensures passwords are always hashed before being stored
+// Existing password hashing middleware remains unchanged
 userSchema.pre<IUser>('save', async function(next) {
-    
-  // Only hash the password if it has been modified (or is new)
-  // NOTE: This check prevents unnecessary hashing on updates that don't modify the password
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(12); // Generate a salt
-    this.password = await bcrypt.hash(this.password, salt); // Hash the password
-    next();
-  } catch (error) {
-    next(error as Error);
-  }
+    if (!this.isModified('password')) return next();
+    try {
+        const salt = await bcrypt.genSalt(12);
+        this.password = await bcrypt.hash(this.password, salt);
+        next();
+    } catch (error) {
+        next(error as Error);
+    }
 });
 
-// Method to compare a candidate password with the stored hashed password
-// NOTE: This method allows secure password comparison without exposing the hash
+// Existing comparePassword method remains unchanged
 userSchema.methods.comparePassword = async function(
-  candidatePassword: string
+    candidatePassword: string
 ): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password);
+    return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Create and export the User model, preventing overwrite in development
-// NOTE: This check prevents model compilation errors in development due to hot reloading
 export const User = models.User || model<IUser>('User', userSchema);
