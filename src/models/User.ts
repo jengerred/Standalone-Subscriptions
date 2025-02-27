@@ -61,9 +61,9 @@ const subscriptionSchema = new Schema<Subscription>({
         maxlength: [50, 'Service name cannot exceed 50 characters']
     },
     status: {
-        type: String,
-        enum: ['active', 'canceled', 'paused'],
-        default: 'active'
+      type: String,
+      enum: ['active', 'canceled', 'paused'],
+      default: 'active'
     },
     nextBilling: {
         type: Date,

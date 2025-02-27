@@ -8,6 +8,7 @@ import {
   BanknotesIcon,
   CommandLineIcon,
 } from '@heroicons/react/24/outline'; // Icons for UI design.
+import SubscriptionCard from '@/components/SubscriptionCard';
 
 // NOTE: This entire file is a placeholder and can be completely customized or removed based on your needs.
 // The dashboard is meant to demonstrate how to create a protected page and display user-specific data.
@@ -48,6 +49,9 @@ export default async function Dashboard() {
                 This protected page serves as a foundation for any application. 
                 Customize it to build anything from banking apps to SaaS platforms.
               </p>
+
+
+<SubscriptionCard />
 
               {/* Action Buttons */}
               {/* NOTE: These buttons link to step-by-step guides for more adding data and UI customization. 

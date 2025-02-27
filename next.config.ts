@@ -11,8 +11,7 @@ const nextConfig: NextConfig = {
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }
       ]
     }
-  ],
-  // Add other config options here
+  ]
 };
 
 export default nextConfig;

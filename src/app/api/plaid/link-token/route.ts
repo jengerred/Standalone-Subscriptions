@@ -1,91 +1,72 @@
-// src/app/api/plaid/link-token/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
-import { User } from '@/models/User';
-import { verifyJWT } from '@/lib/auth';
+import { Configuration, PlaidApi, Products, CountryCode, PlaidEnvironments } from 'plaid';
+import { User } from "@/models/User";
 
 const config = new Configuration({
   basePath: PlaidEnvironments[process.env.PLAID_ENV as keyof typeof PlaidEnvironments],
   baseOptions: {
     headers: {
-      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID || '',
-      'PLAID-SECRET': process.env.PLAID_SECRET || '',
-    },
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+      'Plaid-Version': '2020-09-14'
+    }
   },
 });
 
-const client = new PlaidApi(config);
+const plaidClient = new PlaidApi(config);
 
 export async function POST(req: NextRequest) {
   try {
-    // Authorization check
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { 
-          error: 'Authentication required',
-          code: 'MISSING_AUTH_TOKEN'
-        },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.split(' ')[1];
+    const { client_user_id } = await req.json();
     
-    // JWT Verification
-    const { payload } = await verifyJWT(token);
-    if (!payload.userId) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid authentication token',
-          code: 'INVALID_AUTH_TOKEN'
-        },
-        { status: 401 }
-      );
-    }
+    // Sandbox override
+    const isSandbox = process.env.PLAID_ENV === 'sandbox';
+    const sandboxUserId = isSandbox ? "user_good" : client_user_id;
 
-    // User validation
-    const user = await User.findById(payload.userId);
+    const user = await User.findById(isSandbox ? sandboxUserId : client_user_id)
+      .select('plaidAccessToken');
+
     if (!user) {
-      return NextResponse.json(
-        { 
-          error: 'User account not found',
-          code: 'USER_NOT_FOUND'
-        },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Plaid API call
-    const response = await client.linkTokenCreate({
-      user: { client_user_id: user._id.toString() },
-      client_name: 'Subscription Manager',
-      products: [Products.PaymentInitiation],
+    const linkTokenRequest = {
+      client_name: 'Your App Name',
+      user: {
+        client_user_id: user._id.toString(),
+        ...(isSandbox && { 
+          // Sandbox-specific test credentials
+          test_username: "user_good",
+          test_password: "pass_good"
+        })
+      },
+      products: [Products.Auth],
       country_codes: [CountryCode.Us],
       language: 'en',
-      redirect_uri: process.env.PLAID_REDIRECT_URI,
-    });
+      ...(user.plaidAccessToken && { 
+        access_token: user.plaidAccessToken 
+      })
+    };
 
+    const response = await plaidClient.linkTokenCreate(linkTokenRequest);
+    
     return NextResponse.json({ 
-      link_token: response.data.link_token 
+      link_token: response.data.link_token
     });
 
   } catch (error) {
-    console.error('Plaid Link Token Error:', error);
-    
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : 'An unexpected error occurred';
-    
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     const errorDetails = process.env.NODE_ENV === 'development' && error instanceof Error
       ? error.stack 
       : undefined;
+
+    console.error('Plaid Link Token Error:', errorMessage, errorDetails);
 
     return NextResponse.json(
       {
         error: errorMessage,
         ...(errorDetails && { details: errorDetails }),
-        code: 'PLAID_LINK_TOKEN_ERROR'
+        code: 'PLAID_TOKEN_EXCHANGE_ERROR'
       },
       { status: 500 }
     );
