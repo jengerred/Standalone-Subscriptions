@@ -127,7 +127,7 @@ export function SubscriptionManager({ access_token }: SubscriptionManagerProps) 
                 className="flex flex-col sm:flex-row justify-between items-start bg-gray-50 p-4 rounded-lg shadow-sm border border-gray-200"
               >
                 {/* Subscription Details */}
-                <div>
+                <div className="mb-2">
                   {/* Subscription Name */}
                   <p className="font-bold text-left text-gray-800 text-lg">{sub.name}</p>
 
