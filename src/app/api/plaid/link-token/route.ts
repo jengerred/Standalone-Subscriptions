@@ -1,39 +1,37 @@
 import { NextResponse } from 'next/server';
-import { Configuration, PlaidApi, Products, CountryCode, PlaidEnvironments } from 'plaid';
+import { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode } from 'plaid';
+import { AxiosError } from 'axios';
 
-// Verify credentials are loaded
-console.log('Loaded client ID:', process.env.PLAID_CLIENT_ID);
-console.log('Loaded secret:', process.env.PLAID_SECRET?.substring(0, 4) + '*'.repeat(process.env.PLAID_SECRET?.length - 4));
+const configuration = new Configuration({
+  basePath: PlaidEnvironments.sandbox,
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+    },
+  },
+});
 
-const plaidClient = new PlaidApi(
-  new Configuration({
-    basePath: PlaidEnvironments[process.env.PLAID_ENV as keyof typeof PlaidEnvironments],
-    baseOptions: {
-      headers: {
-        'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-        'PLAID-SECRET': process.env.PLAID_SECRET,
-        'Plaid-Version': '2020-09-14'
-      }
-    }
-  })
-);
+const plaidClient = new PlaidApi(configuration);
 
 export async function POST() {
   try {
-    const request = {
-      client_name: 'Your App',
-      user: {
-        client_user_id: 'unique_user_id', // Must be unique per user
-      },
-      products: [Products.Auth],
+    const response = await plaidClient.linkTokenCreate({
+        user: { client_user_id: 'user-id' },
+        client_name: 'Plaid App',
+        products: [Products.Auth, Products.Transactions],
       country_codes: [CountryCode.Us],
-      language: 'en'
-    };
+        language: 'en',
+      });
+      
 
-    const response = await plaidClient.linkTokenCreate(request);
     return NextResponse.json({ link_token: response.data.link_token });
   } catch (error) {
-    console.error('Plaid Error:', error?.response?.data || error.message);
+    if (error instanceof AxiosError) {
+      console.error('Plaid Error:', error.response?.data || error.message);
+    } else {
+      console.error('Plaid Error:', error);
+    }
     return NextResponse.json(
       { error: 'Link token creation failed' },
       { status: 400 }
