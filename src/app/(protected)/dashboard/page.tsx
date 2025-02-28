@@ -162,7 +162,7 @@ export default async function Dashboard() {
           {/* NOTE: Customize this footer with your own content or remove it if not needed */}
           <footer className="mt-12 text-center text-sm text-gray-500">
             <p>
-              Built with ❤️ using Next.js and Tailwind CSS. 
+              Built with ❤️ using Next.js, Plaid integration and Tailwind CSS. 
               <a href="https://github.com/jengerred/Reusable-NEXT-User-Auth" target="_blank"
                  rel="noopener noreferrer" 
                  className="text-blue-600 hover:underline"> View on GitHub</a>.
